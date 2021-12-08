@@ -1,5 +1,3 @@
-minigamez - A repo full of small (and sometimes glitchy) fun games!
-
 Copyright (C) <year>  <name of author>
 
 This program is free software: you can redistribute it and/or modify
@@ -15,10 +13,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-You will need Pygame 2.0.0 or later installed.
-Python 2 or 3 should work, although I sometimes break Python 3 on accident...
-
-Attributions:
-    OXYGENE-1:  Jakob Fischer
-                jakob@pizzadude.dk
-                www.pizzadude.dk
+OXYGENE-1:  Jakob Fischer
+            jakob@pizzadude.dk
+            www.pizzadude.dk
