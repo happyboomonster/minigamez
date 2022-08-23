@@ -1,4 +1,4 @@
-##Copyright (C) <year>  <name of author>
+##Copyright (C) 2022 Lincoln V.
 ##
 ##This program is free software: you can redistribute it and/or modify
 ##it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@ import pygame
 import random
 
 #get a screen setup
-screen = pygame.display.set_mode([400,400],pygame.SCALED)
+screen = pygame.display.set_mode([400,400], pygame.SCALED | pygame.RESIZABLE)
 pygame.display.set_caption("Bad Tetris")
 
 #get ourself a font
@@ -96,7 +96,7 @@ for makeground in range(0,40):
 for makeground in range(0,40):
     edges.append([200,makeground * 10])
 
-points = 0 #quick point counter
+points = 500 #quick point counter - you lose points the longer it takes you to die!
 
 placedblocks = [] #all the blocks we've already placed...
 
@@ -107,6 +107,9 @@ clock = pygame.time.Clock()
 alive = True
 
 while alive:
+    #decrement our points counter the longer you stay alive
+    points -= 2
+    
     #draw a green rectangle around the playing space
     pygame.draw.rect(screen,[0,255,0],[0,0,200,400],2)
 
@@ -121,7 +124,7 @@ while alive:
         drawpiece(placedblocks[drawblocks][0],placedblocks[drawblocks][1])
 
     #draw our score "points" variable
-    screen.blit( oxygene1.render("SCORE: " + str(points),0,[150,150,150]) , [210,100] )
+    screen.blit( oxygene1.render("SCORE: " + str(points),0,[150,150,150]) , [210,250] )
 
     #move our piece downward and check for ground/other blocks
     piecepos[1] += 10
@@ -211,3 +214,5 @@ while alive:
     #FPS throttle + gamespeed sanity cap
     clock.tick(5)
 pygame.quit()
+
+print("Score: " + str(points)) #print our our final score

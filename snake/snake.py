@@ -1,8 +1,23 @@
+##Copyright (C) 2022 Lincoln V.
+##
+##This program is free software: you can redistribute it and/or modify
+##it under the terms of the GNU General Public License as published by
+##the Free Software Foundation, either version 3 of the License, or
+##(at your option) any later version.
+##
+##This program is distributed in the hope that it will be useful,
+##but WITHOUT ANY WARRANTY; without even the implied warranty of
+##MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+##GNU General Public License for more details.
+##
+##You should have received a copy of the GNU General Public License
+##along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import pygame
 import random
 
 #set up pygame
-screen = pygame.display.set_mode([500,500])
+screen = pygame.display.set_mode([500,500], pygame.RESIZABLE | pygame.SCALED)
 clock = pygame.time.Clock()
 pygame.display.set_caption("Snake")
 
@@ -43,6 +58,21 @@ while alive:
             foodpos = [random.randint(0,49),random.randint(0,49)]
             insert = True
 
+    #did we hit ourselves?
+    if(len(snake) > 1):
+        front_square = snake[len(snake) - 1]
+        for x in range(0,len(snake)):
+            if(x == len(snake) - 1):
+                continue
+            if(front_square[0] < snake[x][0] + 10):
+                if(front_square[0] + 10 > snake[x][0]): #we're colliding with ourselves on the X axis?
+                    if(front_square[1] < snake[x][1] + 10):
+                        if(front_square[1] + 10 > snake[x][1]): #we're colliding with ourselves on the Y axis?
+                            alive = False #we cut ourselves! We died.
+
+    #draw a rectangle around our playing border
+    pygame.draw.rect(screen,[255,0,0],[0,0,500,500],5)
+
     #draw the snake onscreen
     for x in range(0,len(snake)):
         pygame.draw.rect(screen,[170,50,50],[snake[x][0],snake[x][1],10,10],0)
@@ -66,3 +96,6 @@ while alive:
     pygame.display.flip()
     screen.fill([0,0,0])
     clock.tick(15)
+
+print(len(snake))
+pygame.quit()

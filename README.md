@@ -1,6 +1,6 @@
 minigamez - A repo full of small (and sometimes glitchy) fun games!
 
-Copyright (C) <year>  <name of author>
+Copyright (C) 2022 Lincoln V.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
