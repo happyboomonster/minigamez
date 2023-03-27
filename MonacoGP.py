@@ -223,12 +223,12 @@ class Car():
             for y in range(math.floor(my_collision[3]), math.ceil(my_collision[1])):
                 for x in range(math.floor(my_collision[0]),math.ceil(my_collision[2])):
                     if(y < len(arena.arena) and x < len(arena.arena[0]) and x >= 0 and y >= 0):
-                        if(arena.arena[y][x] == 1 or arena.arena[y][x] == 0): #Hit a tree/driving on grass (lost control)? CRASH!
+                        if(arena.arena[y][x] == 1 or arena.arena[y][x] == 0 or arena.arena[y][x] == 2): #Hit a tree/driving on grass (lost control)? CRASH!
                             if(not probe):
                                 self.alive = time.time()
                             else:
                                 return True
-                        elif(arena.arena[y][x] == 5): #Level end?
+                        elif(arena.arena[y][x] == 6): #Level end?
                             if(not probe):
                                 return True #level finished! (only returns this when NOT in probe mode)
         return False
@@ -239,12 +239,12 @@ class Arena():
         self.tiles = [
             [ #grass
             [ 2, 2, 2, 2, 2, 2, 2, 2],
+            [ 2, 2, 2, 2, 5, 2, 2, 2],
             [ 2, 2, 2, 2, 3, 2, 2, 2],
-            [ 2, 2, 2, 2, 3, 2, 2, 2],
-            [ 2, 3, 2, 2, 3, 2, 3, 2],
-            [ 2, 3, 2, 2, 3, 2, 3, 2],
-            [ 2, 3, 2, 2, 2, 2, 3, 2],
-            [ 2, 2, 3, 2, 2, 3, 2, 2],
+            [ 2, 5, 2, 2, 5, 2, 3, 2],
+            [ 2, 3, 2, 2, 3, 2, 5, 2],
+            [ 2, 5, 2, 2, 2, 2, 3, 2],
+            [ 2, 2, 3, 2, 2, 5, 2, 2],
             [ 2, 2, 2, 2, 2, 2, 2, 2]
             ],
 
@@ -257,6 +257,17 @@ class Arena():
             [ 2, 0, 2, 5, 2, 5, 0, 2],
             [ 2, 2, 5, 0, 5, 2, 2, 2],
             [ 2, 2, 2, 5, 2, 2, 2, 2]
+            ],
+
+            [ #house
+            [ 2, 2, 2, 0, 2, 2, 2, 2],
+            [ 2, 2, 0, 1, 0, 2, 2, 2],
+            [ 2, 0, 1, 1, 1, 0, 2, 2],
+            [ 0, 0, 1, 1, 1, 0, 0, 2],
+            [ 2, 0, 1, 1, 1, 0, 2, 2],
+            [ 2, 0, 1, 1, 3, 0, 2, 2],
+            [ 2, 0, 1, 1, 3, 0, 2, 2],
+            [ 2, 0, 0, 0, 0, 0, 2, 2]
             ],
 
             [ #road (middle)
@@ -376,23 +387,37 @@ class Arena():
                 self.current_road_pos = math.floor(self.screen_size[0] - self.current_road_width / 2 - 1)
         # - Generate the new tiles! -
         tile_row = [] #Begin with trees and grass
+        offset = random.randint(0,10)
         for x in range(0,self.screen_size[0]):
-            tile_row.append(self.generate_count % 2) #alternate trees and grass
+            if(self.generate_count % 8 > 6): #houses and trees and grass?
+                if((x + offset) % 4 > 2): #houses?
+                    tile_row.append(2)
+                elif((x + offset) % 4 > 1): #trees?
+                    tile_row.append(1)
+                else: #grass
+                    tile_row.append(0)
+            elif(self.generate_count % 8 > 4): #trees and grass?
+                if((x + offset) % 3 > 1):
+                    tile_row.append(1)
+                else:
+                    tile_row.append(0)
+            else: #grass?
+                tile_row.append(0) #all grass
         # - Add the road in overtop -
         for x in range(math.ceil(self.current_road_pos - self.current_road_width / 2), math.floor(self.current_road_pos + self.current_road_width / 2)):
             if(x == round(self.current_road_pos - self.current_road_width / 2)): #tile furthest to the left?
-                tile_row[x] = 3 #left road side
+                tile_row[x] = 4 #left road side
             elif(x == round(self.current_road_pos + self.current_road_width / 2) - 1): #tile furthest to the left?
-                tile_row[x] = 4 #right road side
+                tile_row[x] = 5 #right road side
             else: #road middle tile
-                tile_row[x] = 2
+                tile_row[x] = 3
         # - Check if this should be the finish -
         if(len(self.arena) > 5000 * self.difficulty):
             if(random.randint(0,math.ceil(10 * self.difficulty)) == 0 and self.made_finish == False):
                 self.made_finish = True
                 # - Level should end here -
                 for x in range(0,len(tile_row)):
-                    tile_row[x] = 5 #end tile
+                    tile_row[x] = 6 #end tile
         # - Move the tiles to the arena! -
         self.arena.append(tile_row)
         # - Update the run counter -
@@ -593,7 +618,7 @@ while loop_continue:
 
         # - Generate new terrain -
         arena.handle_generation()
-        arena.offset[1] += math.sqrt(abs(screen.get_height() - (arena.offset[1] + car.pos[1]))) / 3 #move arena at the same pace as the car
+        arena.offset[1] = -car.pos[1] + screen.get_height() - (car.speed / 4.1) #move arena at the same pace as the car
         
     # - Game -
     if(loop_continue == False): #triggered if the player asked to exit
@@ -672,8 +697,9 @@ while loop_continue:
                 arena.__init__()
                 arena.new_level([int(screen.get_width() / 8), int(screen.get_height() / 8)], level / 11)
                 car.last_tick = time.time() #reset the car timing counter so that it doesn't go flying at the start of the next level
-                for x in range(0,len(enemy_cars)):
-                    enemy_cars[x].last_tick = time.time()
+                enemy_cars = []
+                for x in range(0, level * 2):
+                    enemy_cars.append(Car(arena, screen, True))
                 last_loop = time.time()
         for x in range(0,len(enemy_cars)):
             enemy_cars[x].draw_self(screen, arena, car)
@@ -695,7 +721,7 @@ while loop_continue:
 
         # - Move the arena and the player's car -
         car.move()
-        arena.offset[1] += math.sqrt(abs(screen.get_height() - (arena.offset[1] + car.pos[1]))) / 2.85
+        arena.offset[1] = -car.pos[1] + screen.get_height() - (car.speed / 4.1)
 
         # - Generate new arena space -
         arena.handle_generation()
