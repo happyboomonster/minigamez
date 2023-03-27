@@ -28,8 +28,8 @@ class Car():
         self.decelerate_const = random.randint(3,5) * 10
         self.min_speed = 102
         self.max_speed = 300
-        self.brake_heat_gen = random.randint(45,65) * 10
-        self.brake_heat_release = random.randint(35,55) * 10
+        self.brake_heat_gen = random.randint(2000,3000)
+        self.brake_heat_release = random.randint(4,5)
 
         # - Other setup -
         self.AI_SPACING = 6 #blocks vertically between where each AI spawns
@@ -39,14 +39,14 @@ class Car():
         self.pos = [arena.screen_size[0] * 4,arena.screen_size[1] * 7] #This value CAN be a float
         if(player != None and AI): #we need to set the AI to position itself either after or before the player
             if(random.randint(0,1) == 0): #before player (speed should be greater than player)
-                self.max_speed = random.randint(225,265)
+                self.max_speed = random.randint(275,300)
                 self.pos[1] = player.pos[1] + screen.get_height() + AI_ct * 8 * self.AI_SPACING
             else: #after player (speed should be slower than player)
-                self.max_speed = random.randint(135,175)
+                self.max_speed = random.randint(135,200)
                 self.pos[1] = player.pos[1] - screen.get_height() - AI_ct * 8 * self.AI_SPACING
         elif(player == None and AI):
             self.pos[1] -= screen.get_height() + AI_ct * 8 * self.AI_SPACING #Spawned above the player if this is the start of the game. This is done so that the player does not get immediately slammed from behind.
-            self.max_speed = random.randint(135,175) #Set the max speed to a low number, so that the player does have to pass the cars at the start of the game.
+            self.max_speed = random.randint(135,200) #Set the max speed to a low number, so that the player does have to pass the cars at the start of the game.
         pos = self.find_open_space(arena, screen)
         if(self.AI):
             self.position_bias = 1.0 + random.randint(-50,50) / 100
@@ -121,6 +121,9 @@ class Car():
                 self.speed = 1
             elif(self.speed < self.max_speed):
                 self.speed *= 1 + self.accelerate_const * (time.time() - self.last_tick)
+            # - Now we check if we made it past our maximum speed. If so, set us to that speed -
+            if(self.speed > self.max_speed):
+                self.speed = self.max_speed
 
     # - Self explanatory: Declerates the car (backwards not allowed, dependent on move() being called once per game loop) -
     def decelerate(self):
@@ -201,8 +204,8 @@ class Car():
     # - Returns True when touching another Car() entity -
     def check_car_collision(self, entity): #Check collision with another Car() entity
         if(self.alive == True):
-            my_collision = [self.pos[0], self.pos[1], self.pos[0] + 8, self.pos[1] + 8] #get collision boxes
-            other_collision = [entity.pos[0], entity.pos[1], entity.pos[0] + 8, entity.pos[1] + 8]
+            my_collision = [self.pos[0] + 1, self.pos[1] + 1, self.pos[0] + 7, self.pos[1] + 7] #get collision boxes
+            other_collision = [entity.pos[0] + 1, entity.pos[1] + 1, entity.pos[0] + 7, entity.pos[1] + 7]
             if(my_collision[0] < other_collision[2]):
                 if(my_collision[2] > other_collision[0]):
                     if(my_collision[1] < other_collision[3]):
@@ -214,17 +217,17 @@ class Car():
     def check_arena_collision(self, arena, screen, probe=False):
         # - Readjust our collision boxes so they can be used well with the map (the map is drawn backwards, down-up, not up-down, so the player's collision has to be tweaked a bit to compensate) -
         if(self.alive == True):
-            my_collision = [self.pos[0], self.pos[1] * -1 + screen.get_height(), self.pos[0] + 8, self.pos[1] * -1 + screen.get_height() - 8]
+            my_collision = [self.pos[0] + 1, 1 + self.pos[1] * -1 + screen.get_height(), self.pos[0] + 7, self.pos[1] * -1 + screen.get_height() - 7]
             my_collision = [my_collision[0] / 8, my_collision[1] / 8, my_collision[2] / 8, my_collision[3] / 8]
             for y in range(math.floor(my_collision[3]), math.ceil(my_collision[1])):
                 for x in range(math.floor(my_collision[0]),math.ceil(my_collision[2])):
                     if(y < len(arena.arena) and x < len(arena.arena[0]) and x >= 0 and y >= 0):
-                        if(arena.arena[y][x] == 1 or arena.arena[y][x] == 0 or arena.arena[y][x] == 2): #Hit a tree/driving on grass (lost control)? CRASH!
+                        if(arena.arena[y][x] in [0,1,2,3]): #Hit a tree/driving on grass (lost control)? CRASH!
                             if(not probe):
                                 self.alive = time.time()
                             else:
                                 return True
-                        elif(arena.arena[y][x] == 6): #Level end?
+                        elif(arena.arena[y][x] == 7): #Level end?
                             if(not probe):
                                 return True #level finished! (only returns this when NOT in probe mode)
         return False
@@ -266,36 +269,47 @@ class Arena():
             [ 2, 0, 0, 0, 0, 0, 2, 2]
             ],
 
+            [ #bush
+            [ 2, 2, 2, 0, 0, 2, 2, 2],
+            [ 2, 2, 0, 5, 2, 0, 2, 2],
+            [ 2, 0, 5, 2, 5, 2, 0, 2],
+            [ 2, 0, 2, 5, 2, 5, 0, 2],
+            [ 2, 2, 0, 2, 5, 0, 2, 2],
+            [ 2, 2, 2, 0, 0, 2, 2, 2],
+            [ 2, 2, 2, 0, 0, 2, 2, 2],
+            [ 2, 2, 0, 2, 2, 0, 2, 2]
+            ],
+
             [ #road (middle)
-            [ 0, 0, 0, 0, 4, 0, 0, 0],
-            [ 0, 0, 0, 4, 0, 0, 0, 0],
-            [ 0, 0, 0, 0, 4, 0, 0, 0],
+            [ 4, 0, 0, 0, 0, 0, 0, 4],
+            [ 4, 0, 0, 0, 0, 0, 0, 4],
+            [ 4, 0, 0, 0, 0, 0, 0, 4],
             [ 0, 0, 0, 0, 0, 0, 0, 0],
-            [ 0, 0, 0, 4, 0, 0, 0, 0],
-            [ 0, 0, 0, 0, 4, 0, 0, 0],
-            [ 0, 0, 0, 4, 0, 0, 0, 0],
+            [ 0, 0, 0, 0, 0, 0, 0, 0],
+            [ 0, 0, 0, 0, 0, 0, 0, 0],
+            [ 0, 0, 0, 0, 0, 0, 0, 0],
             [ 0, 0, 0, 0, 0, 0, 0, 0]
             ],
 
             [ #road (left side)
-            [ 2, 0, 0, 0, 4, 0, 0, 0],
-            [ 2, 0, 0, 4, 0, 0, 0, 0],
-            [ 2, 0, 0, 0, 4, 0, 0, 0],
+            [ 2, 0, 0, 0, 0, 0, 0, 4],
+            [ 2, 0, 0, 0, 0, 0, 0, 4],
+            [ 2, 0, 0, 0, 0, 0, 0, 4],
             [ 2, 0, 0, 0, 0, 0, 0, 0],
-            [ 2, 0, 0, 4, 0, 0, 0, 0],
-            [ 2, 0, 0, 0, 4, 0, 0, 0],
-            [ 2, 0, 0, 4, 0, 0, 0, 0],
+            [ 2, 0, 0, 0, 0, 0, 0, 0],
+            [ 2, 0, 0, 0, 0, 0, 0, 0],
+            [ 2, 0, 0, 0, 0, 0, 0, 0],
             [ 2, 0, 0, 0, 0, 0, 0, 0]
             ],
 
             [ #road (right side)
-            [ 0, 0, 0, 0, 4, 0, 0, 2],
-            [ 0, 0, 0, 4, 0, 0, 0, 2],
-            [ 0, 0, 0, 0, 4, 0, 0, 2],
+            [ 4, 0, 0, 0, 0, 0, 0, 2],
+            [ 4, 0, 0, 0, 0, 0, 0, 2],
+            [ 4, 0, 0, 0, 0, 0, 0, 2],
             [ 0, 0, 0, 0, 0, 0, 0, 2],
-            [ 0, 0, 0, 4, 0, 0, 0, 2],
-            [ 0, 0, 0, 0, 4, 0, 0, 2],
-            [ 0, 0, 0, 4, 0, 0, 0, 2],
+            [ 0, 0, 0, 0, 0, 0, 0, 2],
+            [ 0, 0, 0, 0, 0, 0, 0, 2],
+            [ 0, 0, 0, 0, 0, 0, 0, 2],
             [ 0, 0, 0, 0, 0, 0, 0, 2]
             ],
 
@@ -385,35 +399,42 @@ class Arena():
         tile_row = [] #Begin with trees and grass
         offset = random.randint(0,10)
         for x in range(0,self.screen_size[0]):
-            if(self.generate_count % 8 > 6): #houses and trees and grass?
+            if(self.generate_count % 10 > 7): #houses and trees and grass?
                 if((x + offset) % 4 > 2): #houses?
                     tile_row.append(2)
                 elif((x + offset) % 4 > 1): #trees?
                     tile_row.append(1)
                 else: #grass
                     tile_row.append(0)
-            elif(self.generate_count % 8 > 4): #trees and grass?
-                if((x + offset) % 3 > 1):
+            elif(self.generate_count % 10 > 4): #trees and grass and bushes?
+                if((x + offset) % 5 > 3):
+                    tile_row.append(1)
+                elif((x + offset) % 5 > 1):
+                    tile_row.append(3)
+                else:
+                    tile_row.append(0)
+            elif(): #grass and trees?
+                if((x + offset) % 4 > 2):
                     tile_row.append(1)
                 else:
                     tile_row.append(0)
-            else: #grass?
+            else: #grass
                 tile_row.append(0) #all grass
         # - Add the road in overtop -
         for x in range(math.ceil(self.current_road_pos - self.current_road_width / 2), math.floor(self.current_road_pos + self.current_road_width / 2)):
             if(x == round(self.current_road_pos - self.current_road_width / 2)): #tile furthest to the left?
-                tile_row[x] = 4 #left road side
+                tile_row[x] = 5 #left road side
             elif(x == round(self.current_road_pos + self.current_road_width / 2) - 1): #tile furthest to the left?
-                tile_row[x] = 5 #right road side
+                tile_row[x] = 6 #right road side
             else: #road middle tile
-                tile_row[x] = 3
+                tile_row[x] = 4
         # - Check if this should be the finish -
         if(len(self.arena) > 3500 * self.difficulty):
             if(random.randint(0,math.ceil(10 * self.difficulty)) == 0 and self.made_finish == False):
                 self.made_finish = True
                 # - Level should end here -
                 for x in range(0,len(tile_row)):
-                    tile_row[x] = 6 #end tile
+                    tile_row[x] = 7 #end tile
         # - Move the tiles to the arena! -
         self.arena.append(tile_row)
         # - Update the run counter -
@@ -562,6 +583,7 @@ screen = pygame.display.set_mode([128,128],pygame.SCALED | pygame.RESIZABLE | py
 pygame.display.set_caption("Monaco GP")
 loop_continue = True
 font = pygame.font.Font(None, 100)
+clock = pygame.time.Clock()
 while loop_continue:
     # - Front Screen -
     running = True
@@ -612,9 +634,12 @@ while loop_continue:
         # - Update timing counter -
         last_tick = time.time()
 
+        # - Framecap to 60FPS to save battery on mobile devices -
+        clock.tick(60)
+
         # - Generate new terrain -
         arena.handle_generation()
-        arena.offset[1] = -car.pos[1] + screen.get_height() - (car.speed / 4.1) #move arena at the same pace as the car
+        arena.offset[1] = -car.pos[1] + screen.get_height() - (car.speed / 4.5) #move arena at the same pace as the car
         
     # - Game -
     if(loop_continue == False): #triggered if the player asked to exit
@@ -708,11 +733,18 @@ while loop_continue:
         lives_surf = pygame.transform.scale(font.render(lives_left, False, [255,255,255]), [len(lives_left) * 5, 8])
         level_str = "Level " + str(level)
         level_surf = pygame.transform.scale(font.render(level_str, False, [255,255,255]), [len(level_str) * 5, 8])
+        heat_str = "BRAKE HEAT"
+        heat_surf = pygame.transform.scale(font.render(heat_str, False, [255,255,255]), [len(heat_str) * 4, 8])
+        heat_bar = pygame.Surface([heat_surf.get_width(), heat_surf.get_height()])
+        pygame.draw.rect(heat_bar, [255,0,0], [0, 0, int(heat_bar.get_width() * ( car.brake_heat / 10 )), heat_bar.get_height()], 0)
+        pygame.draw.rect(heat_bar, [255,0,0], [0, 0, heat_bar.get_width(), heat_bar.get_height()], 1)
+        heat_bar.blit(heat_surf, [0,0])
         # - Draw the text onscreen -
         screen.blit(distance_surf, [screen.get_width() - distance_surf.get_width(), screen.get_height() - speed_surf.get_height() - distance_surf.get_height()])
         screen.blit(speed_surf, [screen.get_width() - speed_surf.get_width(), screen.get_height() - speed_surf.get_height()])
         screen.blit(lives_surf, [0, screen.get_height() - lives_surf.get_height()])
         screen.blit(level_surf, [screen.get_width() / 2 - level_surf.get_width() / 2, 0])
+        screen.blit(heat_bar, [0, screen.get_height() - speed_surf.get_height() - distance_surf.get_height()])
         pygame.display.flip()
 
         # - Move the arena and the player's car -
@@ -769,6 +801,9 @@ while loop_continue:
 
         # - Update timing counter -
         last_loop = time.time()
+
+        # - Framecap to 60FPS to save battery on mobile devices -
+        clock.tick(60)
 
         # - If level reaches 11, the game has been completed -
         if(level > 10):
