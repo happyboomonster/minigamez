@@ -22,7 +22,7 @@ import math
 #IMPORTANT: Tiles are 8x8 px.
 
 class Car():
-    def __init__(self, arena, screen, AI=False, player=None):
+    def __init__(self, arena, screen, AI=False, player=None, AI_ct=0):
         # - Physics constants -
         self.accelerate_const = random.randint(5,7) * 10
         self.decelerate_const = random.randint(3,5) * 10
@@ -32,29 +32,25 @@ class Car():
         self.brake_heat_release = random.randint(35,55) * 10
 
         # - Other setup -
+        self.AI_SPACING = 6 #blocks vertically between where each AI spawns
         self.AI = AI
+        self.AI_ct = AI_ct
         self.alive = True #This changes to a number which counts down to 0 when the player dies. The reason for doing this is to the explosion frames have time to display themselves.
         self.pos = [arena.screen_size[0] * 4,arena.screen_size[1] * 7] #This value CAN be a float
         if(player != None and AI): #we need to set the AI to position itself either after or before the player
             if(random.randint(0,1) == 0): #before player (speed should be greater than player)
                 self.max_speed = random.randint(225,265)
-                self.pos[1] = player.pos[1] + screen.get_height() * 2.5
+                self.pos[1] = player.pos[1] + screen.get_height() + AI_ct * 8 * self.AI_SPACING
             else: #after player (speed should be slower than player)
                 self.max_speed = random.randint(135,175)
-                self.pos[1] = player.pos[1] - screen.get_height() - 8
+                self.pos[1] = player.pos[1] - screen.get_height() - AI_ct * 8 * self.AI_SPACING
         elif(player == None and AI):
-            self.pos[1] -= arena.screen_size[1] * 8 #Spawned above the player if this is the start of the game. This is done so that the player does not get immediately slammed from behind.
-            self.max_speed = random.randint(102,150) #Set the max speed to a low number, so that the player does have to pass the cars at the start of the game.
+            self.pos[1] -= screen.get_height() + AI_ct * 8 * self.AI_SPACING #Spawned above the player if this is the start of the game. This is done so that the player does not get immediately slammed from behind.
+            self.max_speed = random.randint(135,175) #Set the max speed to a low number, so that the player does have to pass the cars at the start of the game.
         pos = self.find_open_space(arena, screen)
         if(self.AI):
-            self.position_bias = 1.0 + random.randint(-45,45) / 100
+            self.position_bias = 1.0 + random.randint(-50,50) / 100
             random.shuffle(pos)
-            if(player == None):
-                decrement = 0 #delete any positions which conflict with the player's starting position
-                for x in range(0,len(pos)):
-                    if(pos[x - decrement] > arena.screen_size[0] * 4 - 16 and pos[x - decrement] < arena.screen_size[0] * 4 + 16):
-                        del(pos[x - decrement])
-                        decrement += 1
             self.pos[0] = pos[0]
         else:
             self.pos[0] = pos[math.floor(len(pos) / 2)]
@@ -152,9 +148,9 @@ class Car():
                 self.pos[1] += 8 * 4 #revert our position
                 goal_pos = sum(positions) / len(positions) * self.position_bias #average the X pos of open positions, and attempt to go there
                 if(goal_pos - 3 >= self.pos[0]):
-                    direction = 64 * (time.time() - self.last_tick)
+                    direction = 48 * (time.time() - self.last_tick)
                 elif(goal_pos + 3 <= self.pos[0]):
-                    direction = -64 * (time.time() - self.last_tick)
+                    direction = -48 * (time.time() - self.last_tick)
                 else:
                     direction = 0
                 self.pos[0] += direction
@@ -180,7 +176,7 @@ class Car():
         elif(time.time() - self.alive < 3): #we died and need to display the explosion?
             self.appearance = (len(self.image) - 1) - int((time.time() - self.alive) * 8) % 2
         else: #Time to reset...
-            self.__init__(arena, screen, self.AI, player)
+            self.__init__(arena, screen, self.AI, player, self.AI_ct)
             return True
         for y in range(0,len(self.image[self.appearance])):
             for x in range(0,len(self.image[self.appearance][y])):
@@ -359,7 +355,7 @@ class Arena():
     def handle_generation(self):
         finished = False
         while not finished:
-            if(self.offset[1] + self.screen_size[1] * 2 > len(self.arena)): #new territory should be generated if we are 1 screen away from the end of what has been generated already
+            if(self.offset[1] + self.screen_size[1] + 128 * 8 > len(self.arena)): #new territory should be generated if we are 1 screen away from the end of what has been generated already
                 self.generate_road_row()
             else:
                 finished = True
@@ -412,7 +408,7 @@ class Arena():
             else: #road middle tile
                 tile_row[x] = 3
         # - Check if this should be the finish -
-        if(len(self.arena) > 5000 * self.difficulty):
+        if(len(self.arena) > 3500 * self.difficulty):
             if(random.randint(0,math.ceil(10 * self.difficulty)) == 0 and self.made_finish == False):
                 self.made_finish = True
                 # - Level should end here -
@@ -646,7 +642,7 @@ while loop_continue:
     running = True #whether the game should be exited
     # - Player car and AI car setup -
     car = Car(arena, screen)
-    enemy_cars = [ Car(arena, screen, True), Car(arena, screen, True) ]
+    enemy_cars = [ Car(arena, screen, True, None, 0), Car(arena, screen, True, None, 1) ]
     car_directions = [0,0] #used for handling keypresses and converting them into car motion
     brake = False
     last_loop = time.time() #timing counter
@@ -699,7 +695,7 @@ while loop_continue:
                 car.last_tick = time.time() #reset the car timing counter so that it doesn't go flying at the start of the next level
                 enemy_cars = []
                 for x in range(0, level * 2):
-                    enemy_cars.append(Car(arena, screen, True))
+                    enemy_cars.append(Car(arena, screen, True, None, x))
                 last_loop = time.time()
         for x in range(0,len(enemy_cars)):
             enemy_cars[x].draw_self(screen, arena, car)
@@ -728,14 +724,10 @@ while loop_continue:
 
         # - Handle car collision -
         if(car.check_arena_collision(arena, screen)): #the car completed a level (returned True)?
+            # - Manage level/life counters -
             level += 1 #increase the level counter by one
             lives += 1 #add another life to the player's counter
-            arena.__init__() #reset arena with harder level
-            arena.new_level([int(screen.get_width() / 8), int(screen.get_height() / 8)], level / 11)
-            car = Car(arena, screen) #reset player car
-            enemy_cars = [] #add AI cars
-            for x in range(0, level * 2):
-                enemy_cars.append(Car(arena, screen, True))
+            # - Graphical stuff (it must happen in the middle here) -
             while not close(screen): #close the old level
                 pygame.display.flip()
             # - Draw words telling which level is next -
@@ -743,9 +735,15 @@ while loop_continue:
             screen.blit(next_surf, [screen.get_width() / 2 - next_surf.get_width() / 2, screen.get_height() / 2 - next_surf.get_height() / 2])
             pygame.display.flip()
             time.sleep(1.25)
+            # - Manage some other setup, including arena init -
+            arena.__init__() #reset arena with harder level
+            arena.new_level([int(screen.get_width() / 8), int(screen.get_height() / 8)], level / 11)
+            car = Car(arena, screen) #reset player car
+            enemy_cars = [] #add AI cars
+            for x in range(0, level * 2):
+                enemy_cars.append(Car(arena, screen, True, None, x))
             car_directions = [0,0] #reset the keypress list so that the car doesn't move funny when the level starts
-            car.last_tick = time.time() #reset the car timing counter so that it doesn't go flying when the level starts
-            last_loop = time.time()
+            last_loop = time.time() #reset the timer counter in our loop so that we don't steer streight into the walls when the level starts
             
         for x in range(0,len(enemy_cars)):
             car.check_car_collision(enemy_cars[x])
