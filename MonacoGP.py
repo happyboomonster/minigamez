@@ -32,21 +32,25 @@ class Car():
         self.brake_heat_release = random.randint(4,5)
 
         # - Other setup -
-        self.AI_SPACING = 6 #blocks vertically between where each AI spawns
+        self.AI_SPACING = 8 #blocks vertically between where each AI spawns
         self.AI = AI
         self.AI_ct = AI_ct
+        self.AI_speeds = [
+            [165,200],
+            [275,300]
+            ]
         self.alive = True #This changes to a number which counts down to 0 when the player dies. The reason for doing this is to the explosion frames have time to display themselves.
         self.pos = [arena.screen_size[0] * 4,arena.screen_size[1] * 7] #This value CAN be a float
         if(player != None and AI): #we need to set the AI to position itself either after or before the player
             if(random.randint(0,1) == 0): #before player (speed should be greater than player)
-                self.max_speed = random.randint(275,300)
-                self.pos[1] = player.pos[1] + screen.get_height() + AI_ct * 8 * self.AI_SPACING
+                self.max_speed = random.randint(self.AI_speeds[1][0],self.AI_speeds[1][1])
+                self.pos[1] = player.pos[1] + (screen.get_height() * 0.75) + AI_ct * 8 * self.AI_SPACING
             else: #after player (speed should be slower than player)
-                self.max_speed = random.randint(135,200)
+                self.max_speed = random.randint(self.AI_speeds[0][0],self.AI_speeds[0][1])
                 self.pos[1] = player.pos[1] - screen.get_height() - AI_ct * 8 * self.AI_SPACING
         elif(player == None and AI):
             self.pos[1] -= screen.get_height() + AI_ct * 8 * self.AI_SPACING #Spawned above the player if this is the start of the game. This is done so that the player does not get immediately slammed from behind.
-            self.max_speed = random.randint(135,200) #Set the max speed to a low number, so that the player does have to pass the cars at the start of the game.
+            self.max_speed = random.randint(self.AI_speeds[0][0],self.AI_speeds[0][1]) #Set the max speed to a low number, so that the player does have to pass the cars at the start of the game.
         pos = self.find_open_space(arena, screen)
         if(self.AI):
             self.position_bias = 1.0 + random.randint(-50,50) / 100
@@ -349,6 +353,16 @@ class Arena():
         self.generate_count = 0 #how many times generate_road_row() has been run
         self.difficulty = 1 #valid values: anything above 0...1 is best left as the maximum difficulty.
         self.made_finish = False
+        #   - These are for determining self.current_road_pos
+        self.direction = 0 #negative = left, positive = right
+        self.momentum = 0 #this is how direction gets changed (kinda like acceleration in physics)
+        self.direction_timer_max = 10 #minimum number of blocks you MUST move the same direction before you may change direction
+        self.direction_timer = 0
+        #   - These are for determining self.current_road_width
+        self.size = 0
+        self.size_change = 0
+        self.size_timer_max = 25
+        self.size_timer = 0
 
     # - Configures a screen size and loads a new level -
     def new_level(self,screen_size,difficulty=1):
@@ -376,25 +390,64 @@ class Arena():
 
     # - Generates a new row of tiles for the arena/track -
     def generate_road_row(self):
-        # - Readjust the road's width with a SMALL chance -
-        if(random.randint(0,7) == 0):
-            self.current_road_width += random.randint(-math.ceil(self.screen_size[0] / (8 / self.difficulty)),math.ceil(self.screen_size[0] / (8 / self.difficulty)))
-            if(self.current_road_width < math.ceil(self.screen_size[0] / 3)): #road too thin?
-                self.current_road_width = math.ceil(self.screen_size[0] / 3)
-            elif(self.current_road_width > self.screen_size[0] - 3): #this road is too wide for the screen?
-                self.current_road_width = self.screen_size[0] - 3
-            # - Does this road connect to the last one? It'd better... -
-            if(math.floor(self.current_road_pos - self.current_road_width / 2) < 1): #road too far off to the left?
-                self.current_road_pos = math.ceil(self.current_road_width / 2 + 1)
-            elif(math.ceil(self.current_road_pos + self.current_road_width / 2) > self.screen_size[0] - 1): #road too far to the right?
-                self.current_road_pos = math.floor(self.screen_size[0] - self.current_road_width / 2 - 1)
-        # - Reposition the center of the road -
-        elif(random.randint(0,7) == 0):
-            self.current_road_pos += random.randint(max([-math.ceil(self.screen_size[0] / (8 / self.difficulty)), -math.floor(self.current_road_width / (4 / self.difficulty))]),min([math.ceil(self.current_road_width / (4 / self.difficulty)), math.ceil(self.screen_size[0] / (8 / self.difficulty))]))
-            if(math.floor(self.current_road_pos - self.current_road_width / 2) < 1): #road too far off to the left?
-                self.current_road_pos = math.ceil(self.current_road_width / 2 + 1)
-            elif(math.ceil(self.current_road_pos + self.current_road_width / 2) >= self.screen_size[0] - 1): #road too far to the right?
-                self.current_road_pos = math.floor(self.screen_size[0] - self.current_road_width / 2 - 1)
+        # - Readjust the road's position -
+        self.current_road_pos += self.momentum #was self.direction
+        self.direction += self.momentum
+        if(self.momentum != 0 and abs(self.momentum) / self.momentum > 0): #move right?
+            if(self.direction_timer < self.direction_timer_max and abs(self.momentum) < self.difficulty * 1.25):
+                self.momentum += round(self.difficulty / 2,2)
+            else:
+                self.momentum -= round(self.difficulty / 2,2)
+                if(self.momentum == 0):
+                    self.direction_timer = 0
+        elif(self.momentum != 0 and abs(self.momentum) / self.momentum < 0): #move left?
+            if(self.direction_timer < self.direction_timer_max and abs(self.momentum) < self.difficulty * 1.25):
+                self.momentum -= round(self.difficulty / 2,2)
+            else:
+                self.momentum += round(self.difficulty / 2,2)
+                if(self.momentum == 0):
+                    self.direction_timer = 0
+        else: #streight?
+            if(self.direction_timer > self.direction_timer_max):
+                self.momentum = [-round(self.difficulty / 2,2), round(self.difficulty / 2,2)][random.randint(0,1)]
+                self.direction_timer = 0
+        self.direction_timer += 1
+        # - Reposition the size of the road -
+        self.current_road_width += self.size_change #was self.size
+        self.size += self.size_change
+        if(self.size_change != 0 and abs(self.size_change) / self.size_change > 0): #move right?
+            if(self.size_timer < self.size_timer_max and abs(self.size_change) < self.difficulty * 1.25):
+                self.size_change += 1
+            else:
+                self.size_change -= 1
+                if(self.size_change == 0):
+                    self.size_timer = 0
+        elif(self.size_change != 0 and abs(self.size_change) / self.size_change < 0): #move left?
+            if(self.size_timer < self.size_timer_max and abs(self.size_change) < self.difficulty * 1.25):
+                self.size_change -= 1
+            else:
+                self.size_change += 1
+                if(self.size_change == 0):
+                    self.size_timer = 0
+        else: #straight?
+            if(self.size_timer > self.size_timer_max):
+                self.size_change = [-1, 1][random.randint(0,1)]
+                self.size_timer = 0
+        self.size_timer += 1
+        # - Road position sanity checks -
+        if(math.floor(self.current_road_pos - self.current_road_width / 2) < 1): #road too far off to the left?
+            self.current_road_pos = math.floor(self.current_road_width / 2 + 1)
+        elif(math.ceil(self.current_road_pos + self.current_road_width / 2) >= self.screen_size[0] - 1): #road too far to the right?
+            self.current_road_pos = math.floor(self.screen_size[0] - self.current_road_width / 2 - 1)
+        if(self.current_road_width < math.ceil(self.screen_size[0] / 3)): #road too thin?
+            self.current_road_width = math.ceil(self.screen_size[0] / 3)
+        elif(self.current_road_width > self.screen_size[0] - 3): #this road is too wide for the screen?
+            self.current_road_width = self.screen_size[0] - 3
+        # - Does this road connect to the last one? It'd better... -
+        if(math.floor(self.current_road_pos - self.current_road_width / 2) < 1): #road too far off to the left?
+            self.current_road_pos = math.floor(self.current_road_width / 2 + 1)
+        elif(math.ceil(self.current_road_pos + self.current_road_width / 2) > self.screen_size[0] - 1): #road too far to the right?
+            self.current_road_pos = math.floor(self.screen_size[0] - self.current_road_width / 2 - 1)
         # - Generate the new tiles! -
         tile_row = [] #Begin with trees and grass
         offset = random.randint(0,10)
@@ -578,8 +631,11 @@ def open(screen):
         return False
 
 # - Game Loop -
+AI_coefficient = 1 #level * AI_coefficient + AI_offset = AI count on each level
+AI_offset = 1 #level * AI_coefficient + AI_offset = AI count on each level
 pygame.font.init()
-screen = pygame.display.set_mode([128,128],pygame.SCALED | pygame.RESIZABLE | pygame.HWACCEL)
+screen = pygame.display.set_mode([256,256],pygame.SCALED | pygame.RESIZABLE | pygame.HWACCEL)
+arena_surf = pygame.Surface([128,128])
 pygame.display.set_caption("Monaco GP")
 loop_continue = True
 font = pygame.font.Font(None, 100)
@@ -588,11 +644,11 @@ while loop_continue:
     # - Front Screen -
     running = True
     arena = Arena() #arena used for scrolling background
-    arena.new_level([int(screen.get_width() / 8), int(screen.get_height() / 8)])
+    arena.new_level([int(arena_surf.get_width() / 8), int(arena_surf.get_height() / 8)], 0.5)
     last_tick = time.time() #timing variable
     car = Car(arena, screen, True) #car used to drive on the arena (adds interest to the title screen)
-    car.pos[1] = screen.get_height() / 2
-    car.pos[0] = sum(car.find_open_space(arena, screen)) / len(car.find_open_space(arena, screen))
+    car.pos[1] = arena_surf.get_height() / 2
+    car.pos[0] = sum(car.find_open_space(arena, arena_surf)) / len(car.find_open_space(arena, arena_surf))
     while running:
         # - Event Loop -
         for event in pygame.event.get():
@@ -604,26 +660,27 @@ while loop_continue:
 
         # - Draw everything (title screen, "press any key to play", scrolling arena) -
         screen.fill([0,0,0]) #clear display
-        arena.draw_self(screen) #draw arena
-        car.draw_self(screen, arena) #draw car
+        arena.draw_self(arena_surf) #draw arena
+        car.draw_self(arena_surf, arena) #draw car
+        screen.blit(pygame.transform.scale(arena_surf, [screen.get_width(), screen.get_height()]), [0, 0])
         # - Handling the car is part of the draw routine -
         if(car.alive != True): #If the car is dead, reset it. NOTE: the 2.5s wait for the explosion will need to be changed if the explosion time in the Car() class is changed.
             closed = close(screen)
             if(time.time() - car.alive > 2.5 or closed):
                 arena.__init__()
-                arena.new_level([int(screen.get_width() / 8), int(screen.get_height() / 8)])
-                car = Car(arena, screen, True)
-                car.pos[1] = screen.get_height() / 2
-                car.pos[0] = sum(car.find_open_space(arena, screen)) / len(car.find_open_space(arena, screen))
-        if(car.check_arena_collision(arena, screen)): #car completed the level? Make a new one!
+                arena.new_level([int(arena_surf.get_width() / 8), int(arena_surf.get_height() / 8)], 0.5)
+                car = Car(arena, arena_surf, True)
+                car.pos[1] = arena_surf.get_height() / 2
+                car.pos[0] = sum(car.find_open_space(arena, arena_surf)) / len(car.find_open_space(arena, arena_surf))
+        if(car.check_arena_collision(arena, arena_surf)): #car completed the level? Make a new one!
             if(close(screen)): #close the viewport, and reset the demo screen
                 arena.__init__()
-                arena.new_level([int(screen.get_width() / 8), int(screen.get_height() / 8)])
-                car = Car(arena, screen, True)
-                car.pos[1] = screen.get_height() / 2
-                car.pos[0] = sum(car.find_open_space(arena, screen)) / len(car.find_open_space(arena, screen))
+                arena.new_level([int(arena_surf.get_width() / 8), int(arena_surf.get_height() / 8)], 0.5)
+                car = Car(arena, arena_surf, True)
+                car.pos[1] = arena_surf.get_height() / 2
+                car.pos[0] = sum(car.find_open_space(arena, arena_surf)) / len(car.find_open_space(arena, arena_surf))
         else: #if the car ISN'T finished the level...
-            car.move(arena, screen)
+            car.move(arena, arena_surf)
         # - Draw font-based things onscreen -
         screen.blit( pygame.transform.scale( font.render("MONACO GP",False,[255,255,255]), [screen.get_width(), int(screen.get_height() / 8)]), [0,0]) #title
         if(int(last_tick * 2) % 2 == 0): #blink the "press any key" words
@@ -639,7 +696,7 @@ while loop_continue:
 
         # - Generate new terrain -
         arena.handle_generation()
-        arena.offset[1] = -car.pos[1] + screen.get_height() - (car.speed / 4.5) #move arena at the same pace as the car
+        arena.offset[1] = -car.pos[1] + arena_surf.get_height() - (car.speed / 4.5) #move arena at the same pace as the car
         
     # - Game -
     if(loop_continue == False): #triggered if the player asked to exit
@@ -663,12 +720,15 @@ while loop_continue:
     time.sleep(1.25)
     # - Arena -
     arena = Arena()
-    arena.new_level([int(screen.get_width() / 8), int(screen.get_height() / 8)], level / 11)
+    arena.new_level([int(arena_surf.get_width() / 8), int(arena_surf.get_height() / 8)], level / 11)
     running = True #whether the game should be exited
     # - Player car and AI car setup -
-    car = Car(arena, screen)
-    enemy_cars = [ Car(arena, screen, True, None, 0), Car(arena, screen, True, None, 1) ]
+    car = Car(arena, arena_surf)
+    enemy_cars = []
+    for x in range(0, AI_coefficient * level + AI_offset):
+        enemy_cars.append(Car(arena, arena_surf, True, None, x))
     car_directions = [0,0] #used for handling keypresses and converting them into car motion
+    car_presses = [] #list of keypresses currently active
     brake = False
     last_loop = time.time() #timing counter
     while running:
@@ -679,31 +739,48 @@ while loop_continue:
                 loop_continue = False
             if(event.type == pygame.KEYDOWN):
                 if(event.key == pygame.K_UP):
-                    car_directions[1] = 1
+                    car_presses.append(1)
                 elif(event.key == pygame.K_DOWN):
-                    car_directions[1] = -1
+                    car_presses.append(-1)
                 elif(event.key == pygame.K_LEFT):
-                    car_directions[0] = -64
+                    car_presses.append(-64)
                 elif(event.key == pygame.K_RIGHT):
-                    car_directions[0] = 64
+                    car_presses.append(64)
                 elif(event.key == pygame.K_SPACE):
                     brake = True
             elif(event.type == pygame.KEYUP):
                 if(event.key == pygame.K_UP):
-                    car_directions[1] = 0
+                    while(1 in car_presses):
+                        car_presses.remove(1)
                 elif(event.key == pygame.K_DOWN):
-                    car_directions[1] = 0
+                    while(-1 in car_presses):
+                        car_presses.remove(-1)
                 elif(event.key == pygame.K_LEFT):
-                    car_directions[0] = 0
+                    while(-64 in car_presses):
+                        car_presses.remove(-64)
                 elif(event.key == pygame.K_RIGHT):
-                    car_directions[0] = 0
+                    while(64 in car_presses):
+                        car_presses.remove(64)
                 elif(event.key == pygame.K_SPACE):
                     brake = False
+
+        # - Calculate 'car_directions' from 'car_presses' -
+        if(len(car_presses) > 0):
+            x_pos = 0
+            y_pos = 0
+            for x in range(0,len(car_presses)):
+                if(abs(car_presses[x]) == 64): #x motion
+                    x_pos += car_presses[x]
+                else: #y motion
+                    y_pos += car_presses[x]
+            car_directions = [x_pos, y_pos]
+        else:
+            car_directions = [0, 0]
         
         # - Draw everything -
         screen.fill([0,0,0]) #clear screen
-        arena.draw_self(screen) #draw arena
-        if(car.draw_self(screen, arena, car)):
+        arena.draw_self(arena_surf) #draw arena
+        if(car.draw_self(arena_surf, arena, car)):
             while not close(screen): #close the level
                 pygame.display.flip()
             lives -= 1
@@ -716,25 +793,26 @@ while loop_continue:
                 running = False
             else: #restart the level otherwise
                 arena.__init__()
-                arena.new_level([int(screen.get_width() / 8), int(screen.get_height() / 8)], level / 11)
+                arena.new_level([int(arena_surf.get_width() / 8), int(arena_surf.get_height() / 8)], level / 11)
                 car.last_tick = time.time() #reset the car timing counter so that it doesn't go flying at the start of the next level
                 enemy_cars = []
-                for x in range(0, level * 2):
-                    enemy_cars.append(Car(arena, screen, True, None, x))
+                for x in range(0, AI_coefficient * level + AI_offset):
+                    enemy_cars.append(Car(arena, arena_surf, True, None, x))
                 last_loop = time.time()
         for x in range(0,len(enemy_cars)):
-            enemy_cars[x].draw_self(screen, arena, car)
+            enemy_cars[x].draw_self(arena_surf, arena, car)
+        screen.blit(pygame.transform.scale(arena_surf, [screen.get_width(), screen.get_height()]), [0, 0])
         # - Draw the player's life counter, speed, level, and distance travelled -
-        distance = str(int(abs(car.pos[1] - screen.get_height()) / 8)) + " KM Travelled"
-        distance_surf = pygame.transform.scale(font.render(distance, False, [255,255,255]), [len(distance) * 5, 8])
-        speed = str(int(car.speed / 8)) + " KM/S"
-        speed_surf = pygame.transform.scale(font.render(speed, False, [255,255,255]), [len(speed) * 5, 8])
+        distance = str(int(abs(car.pos[1] - screen.get_height()) / 8)) + " M Travelled"
+        distance_surf = pygame.transform.scale(font.render(distance, False, [255,255,255]), [len(distance) * 10, 16])
+        speed = str(int(car.speed / 8)) + " M/S"
+        speed_surf = pygame.transform.scale(font.render(speed, False, [255,255,255]), [len(speed) * 10, 16])
         lives_left = str(lives) + " Crashes Left"
-        lives_surf = pygame.transform.scale(font.render(lives_left, False, [255,255,255]), [len(lives_left) * 5, 8])
+        lives_surf = pygame.transform.scale(font.render(lives_left, False, [255,255,255]), [len(lives_left) * 10, 16])
         level_str = "Level " + str(level)
-        level_surf = pygame.transform.scale(font.render(level_str, False, [255,255,255]), [len(level_str) * 5, 8])
+        level_surf = pygame.transform.scale(font.render(level_str, False, [255,255,255]), [len(level_str) * 10, 16])
         heat_str = "BRAKE HEAT"
-        heat_surf = pygame.transform.scale(font.render(heat_str, False, [255,255,255]), [len(heat_str) * 4, 8])
+        heat_surf = pygame.transform.scale(font.render(heat_str, False, [255,255,255]), [len(heat_str) * 8, 16])
         heat_bar = pygame.Surface([heat_surf.get_width(), heat_surf.get_height()])
         pygame.draw.rect(heat_bar, [255,0,0], [0, 0, int(heat_bar.get_width() * ( car.brake_heat / 10 )), heat_bar.get_height()], 0)
         pygame.draw.rect(heat_bar, [255,0,0], [0, 0, heat_bar.get_width(), heat_bar.get_height()], 1)
@@ -749,13 +827,18 @@ while loop_continue:
 
         # - Move the arena and the player's car -
         car.move()
-        arena.offset[1] = -car.pos[1] + screen.get_height() - (car.speed / 4.1)
+        arena.offset[1] = -car.pos[1] + arena_surf.get_height() - (car.speed / 4.1)
+
+        # - Respawn enemy cars when they get too far away from the player -
+        for x in range(0,len(enemy_cars)):
+            if(enemy_cars[x].pos[1] > car.pos[1] + arena_surf.get_height() * 3 or enemy_cars[x].pos[1] < car.pos[1] - arena_surf.get_height() * 3):
+                enemy_cars[x] = Car(arena, arena_surf, True, car, x)
 
         # - Generate new arena space -
         arena.handle_generation()
 
         # - Handle car collision -
-        if(car.check_arena_collision(arena, screen)): #the car completed a level (returned True)?
+        if(car.check_arena_collision(arena, arena_surf)): #the car completed a level (returned True)?
             # - Manage level/life counters -
             level += 1 #increase the level counter by one
             lives += 1 #add another life to the player's counter
@@ -769,11 +852,11 @@ while loop_continue:
             time.sleep(1.25)
             # - Manage some other setup, including arena init -
             arena.__init__() #reset arena with harder level
-            arena.new_level([int(screen.get_width() / 8), int(screen.get_height() / 8)], level / 11)
-            car = Car(arena, screen) #reset player car
+            arena.new_level([int(arena_surf.get_width() / 8), int(arena_surf.get_height() / 8)], level / 11)
+            car = Car(arena, arena_surf) #reset player car
             enemy_cars = [] #add AI cars
-            for x in range(0, level * 2):
-                enemy_cars.append(Car(arena, screen, True, None, x))
+            for x in range(0, AI_coefficient * level + AI_offset):
+                enemy_cars.append(Car(arena, arena_surf, True, None, x))
             car_directions = [0,0] #reset the keypress list so that the car doesn't move funny when the level starts
             last_loop = time.time() #reset the timer counter in our loop so that we don't steer streight into the walls when the level starts
             
@@ -781,8 +864,8 @@ while loop_continue:
             car.check_car_collision(enemy_cars[x])
             enemy_cars[x].check_car_collision(car)
 
-            enemy_cars[x].move(arena, screen, car)
-            enemy_cars[x].check_arena_collision(arena, screen)
+            enemy_cars[x].move(arena, arena_surf, car)
+            enemy_cars[x].check_arena_collision(arena, arena_surf)
 
             for y in range(0,len(enemy_cars)):
                 if(y == x):
