@@ -24,15 +24,15 @@ import math
 class Car():
     def __init__(self, arena, screen, AI=False, player=None, AI_ct=0):
         # - Physics constants -
-        self.accelerate_const = random.randint(5,7) * 10
-        self.decelerate_const = random.randint(3,5) * 10
+        self.accelerate_const = random.randint(5,7) * 0.5
+        self.decelerate_const = random.randint(3,5) * 0.5
         self.min_speed = 102
         self.max_speed = 300
-        self.brake_heat_gen = random.randint(2000,3000)
+        self.brake_heat_gen = random.randint(175,250)
         self.brake_heat_release = random.randint(4,5)
 
         # - Other setup -
-        self.AI_SPACING = 8 #blocks vertically between where each AI spawns
+        self.AI_SPACING = 3 #blocks vertically between where each AI spawns
         self.AI = AI
         self.AI_ct = AI_ct
         self.AI_speeds = [
@@ -685,7 +685,7 @@ def open(screen):
 
 # - Game Loop -
 AI_coefficient = 1 #level * AI_coefficient + AI_offset = AI count on each level
-AI_offset = 1 #level * AI_coefficient + AI_offset = AI count on each level
+AI_offset = 4 #level * AI_coefficient + AI_offset = AI count on each level
 pygame.font.init()
 screen = pygame.display.set_mode([256,256], pygame.RESIZABLE | pygame.HWACCEL)
 arena_surf = pygame.Surface([128,128])
@@ -928,6 +928,9 @@ while loop_continue:
                     continue
                 enemy_cars[x].check_car_collision(enemy_cars[y])
 
+        # - Framecap to 60FPS to save battery on mobile devices -
+        clock.tick(60)
+
         # - Car movements corresponding to keypresses -
         if(car.alive == True):
             car.pos[0] += car_directions[0] * (time.time() - last_loop)
@@ -940,9 +943,6 @@ while loop_continue:
 
         # - Update timing counter -
         last_loop = time.time()
-
-        # - Framecap to 60FPS to save battery on mobile devices -
-        clock.tick(60)
 
         # - If level reaches 11, the game has been completed -
         if(level > 10):
