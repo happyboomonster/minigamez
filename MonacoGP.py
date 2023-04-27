@@ -24,33 +24,33 @@ import math
 class Car():
     def __init__(self, arena, screen, AI=False, player=None, AI_ct=0):
         # - Physics constants -
-        self.accelerate_const = random.randint(5,7) * 0.5
-        self.decelerate_const = random.randint(3,5) * 0.5
-        self.min_speed = 102
+        self.accelerate_const = 3
+        self.decelerate_const = 1.75
+        self.min_speed = 150
         self.max_speed = 300
-        self.brake_heat_gen = random.randint(175,250)
-        self.brake_heat_release = random.randint(4,5)
+        self.brake_heat_gen = 200
+        self.brake_heat_release = 4
 
         # - Other setup -
-        self.AI_SPACING = 3 #blocks vertically between where each AI spawns
+        self.AI_SPACING = 6 #blocks vertically between where each AI spawns
         self.AI = AI
         self.AI_ct = AI_ct
         self.AI_speeds = [
-            [165,200],
-            [275,300]
+            185,
+            300
             ]
         self.alive = True #This changes to a number which counts down to 0 when the player dies. The reason for doing this is to the explosion frames have time to display themselves.
         self.pos = [arena.screen_size[0] * 4,arena.screen_size[1] * 7] #This value CAN be a float
         if(player != None and AI): #we need to set the AI to position itself either after or before the player
             if(random.randint(0,1) == 0): #before player (speed should be greater than player)
-                self.max_speed = random.randint(self.AI_speeds[1][0],self.AI_speeds[1][1])
-                self.pos[1] = player.pos[1] + (screen.get_height() * 0.75) + AI_ct * 8 * self.AI_SPACING
+                self.max_speed = self.AI_speeds[1] - AI_ct
+                self.pos[1] = player.pos[1] + (screen.get_height() * 0.75)
             else: #after player (speed should be slower than player)
-                self.max_speed = random.randint(self.AI_speeds[0][0],self.AI_speeds[0][1])
+                self.max_speed = self.AI_speeds[0] + AI_ct
                 self.pos[1] = player.pos[1] - screen.get_height() - AI_ct * 8 * self.AI_SPACING
         elif(player == None and AI):
             self.pos[1] -= screen.get_height() + AI_ct * 8 * self.AI_SPACING #Spawned above the player if this is the start of the game. This is done so that the player does not get immediately slammed from behind.
-            self.max_speed = random.randint(self.AI_speeds[0][0],self.AI_speeds[0][1]) #Set the max speed to a low number, so that the player does have to pass the cars at the start of the game.
+            self.max_speed = self.AI_speeds[0] + AI_ct #Set the max speed to a low number, so that the player does have to pass the cars at the start of the game.
         pos = self.find_open_space(arena, screen)
         if(self.AI):
             self.position_bias = 1.0 + random.randint(-50,50) / 100
@@ -61,6 +61,7 @@ class Car():
         self.speed = self.min_speed #this is a variable controlling how fast self.pos[1] is decremented.
         self.last_tick = time.time()
         self.brake_heat = 0
+        self.change_lane_timer = time.time() + AI_ct / 4
 
         self.colors = [
             None,
@@ -161,6 +162,10 @@ class Car():
                 else:
                     direction = 0
                 self.pos[0] += direction
+                # - Change the AI's position -
+                if(time.time() - self.change_lane_timer > 1):
+                    self.change_lane_timer = time.time()
+                    self.position_bias += random.randint(-30,30) / 100
         # - Force decelerate the player if they are dead -
         else:
             if(self.speed > self.min_speed):
@@ -180,7 +185,7 @@ class Car():
         offset = arena.offset[:]
         if(self.alive == True):
             pass
-        elif(time.time() - self.alive < 3): #we died and need to display the explosion?
+        elif(time.time() - self.alive < 2): #we died and need to display the explosion?
             self.appearance = (len(self.image) - 1) - int((time.time() - self.alive) * 8) % 2
         else: #Time to reset...
             self.__init__(arena, screen, self.AI, player, self.AI_ct)
@@ -685,7 +690,7 @@ def open(screen):
 
 # - Game Loop -
 AI_coefficient = 1 #level * AI_coefficient + AI_offset = AI count on each level
-AI_offset = 4 #level * AI_coefficient + AI_offset = AI count on each level
+AI_offset = 3 #level * AI_coefficient + AI_offset = AI count on each level
 pygame.font.init()
 screen = pygame.display.set_mode([256,256], pygame.RESIZABLE | pygame.HWACCEL)
 arena_surf = pygame.Surface([128,128])
@@ -887,7 +892,7 @@ while loop_continue:
 
         # - Respawn enemy cars when they get too far away from the player -
         for x in range(0,len(enemy_cars)):
-            if(enemy_cars[x].pos[1] > car.pos[1] + arena_surf.get_height() * 3 or enemy_cars[x].pos[1] < car.pos[1] - arena_surf.get_height() * 3):
+            if(enemy_cars[x].pos[1] > car.pos[1] + arena_surf.get_height() or enemy_cars[x].pos[1] < car.pos[1] - arena_surf.get_height() * 5.5):
                 enemy_cars[x] = Car(arena, arena_surf, True, car, x)
 
         # - Generate new arena space -
